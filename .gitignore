@@ -5,6 +5,10 @@
 *.so
 *.dylib
 
+# Compiled
+awsxraymockserver
+awsxraymock
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -22,3 +26,8 @@ vendor/
 # Temporary files
 *.tmp
 *.temp
+
+# certs, keys, etc
+*.key
+*.csr
+*.crt

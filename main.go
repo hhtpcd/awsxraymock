@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"os"
 	"sync"
 
@@ -15,6 +16,7 @@ var logger *zap.Logger
 var statusManager = NewStatusManager()
 var StatusOK = "OK"
 var StatusThrottled = "Throttled"
+var crtPath, keyPath string
 
 type StatusManager struct {
 	mutex  sync.RWMutex
@@ -137,6 +139,11 @@ func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Define flags for certificate and key file paths
+	certPath := flag.String("cert", "/path/to/cert.pem", "Path to the TLS certificate file")
+	keyPath := flag.String("key", "/path/to/key.pem", "Path to the TLS key file")
+	flag.Parse()
+
 	// Register handler for /TraceSegments path
 	http.HandleFunc("/TraceSegments", handleTraceSegments)
 	http.HandleFunc("/SetOK", handleSetOK)
@@ -152,8 +159,8 @@ func main() {
 	logger = zap.New(core)
 
 	// Start server on port 8080
-	logger.Info("Starting server on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	logger.Info("Starting server on :8443")
+	if err := http.ListenAndServeTLS(":8443", *certPath, *keyPath, nil); err != nil {
 		logger.Fatal("Server failed to start: %v", zap.Error(err))
 	}
 }

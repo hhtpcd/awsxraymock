@@ -8,10 +8,17 @@ Mock the AWS X-Ray API for testing. Can toggle on/off API throttling.
 go build -o awsxraymockserver -ldflags="-s -w" -v .
 ```
 
+## Generate TLS certficiates
+
+```sh
+openssl req -new -subj "/C=US/ST=Utah/CN=localhost" -newkey rsa:2048 -nodes -keyout localhost.key -out localhost.csr
+openssl x509 -req -days 365 -in localhost.csr -signkey localhost.key -out localhost.crt
+```
+
 ## Run
 
 ```sh
-./awsxraymockserver
+./awsxraymockserver -crt localhost.crt -key localhost.key
 ```
 
 ## Usage
