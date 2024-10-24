@@ -35,6 +35,10 @@ type ThrottledException struct {
 	Type    string `json:"__type"`
 }
 
+func handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 func handleSetOK(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

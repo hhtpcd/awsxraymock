@@ -25,6 +25,7 @@ func main() {
 	http.HandleFunc("/TraceSegments", handleTraceSegments)
 	http.HandleFunc("/SetOK", handleSetOK)
 	http.HandleFunc("/SetThrottled", handleSetThrottled)
+	http.HandleFunc("/healthz", handleHealthz)
 
 	config := zap.NewProductionEncoderConfig()
 	config.EncodeTime = zapcore.ISO8601TimeEncoder
