@@ -177,3 +177,33 @@ func Test_handleTraceSegments(t *testing.T) {
 		})
 	}
 }
+
+func Test_handleHealthz(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		url          string
+		expectedCode int
+	}{
+		{
+			name:         "Success",
+			method:       http.MethodGet,
+			url:          "/healthz",
+			expectedCode: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger = zap.NewNop()
+			req := httptest.NewRequest(tt.method, tt.url, nil)
+			w := httptest.NewRecorder()
+
+			handleHealthz(w, req)
+
+			if w.Code != tt.expectedCode {
+				t.Errorf("handleHealthz() = %v, want %v", w.Code, tt.expectedCode)
+			}
+		})
+	}
+}
