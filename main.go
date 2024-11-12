@@ -25,7 +25,10 @@ func main() {
 	http.HandleFunc("/TraceSegments", handleTraceSegments)
 	http.HandleFunc("/SetOK", handleSetOK)
 	http.HandleFunc("/SetThrottled", handleSetThrottled)
-	http.HandleFunc("/healthz", handleHealthz)
+
+	// Create a separate ServeMux for the healthz endpoint
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/healthz", handleHealthz)
 
 	config := zap.NewProductionEncoderConfig()
 	config.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -35,6 +38,13 @@ func main() {
 	)
 
 	logger = zap.New(core)
+
+	logger.Info("starting server for health endpoints on :8080")
+	go func() {
+		if err := http.ListenAndServe(":8080", healthMux); err != nil {
+			logger.Fatal("Health server failed to start: %v", zap.Error(err))
+		}
+	}()
 
 	// Start server on port 8080
 	logger.Info("Starting server on :8443")
