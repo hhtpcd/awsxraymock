@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 // ThrottleResponse represents the JSON response structure
@@ -88,6 +89,27 @@ func handleSetThrottled(w http.ResponseWriter, r *http.Request) {
 	statusManager.SetThrottled(rateValue)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// RateLimitHandler is a middleware that applies rate limiting to a handler
+// The rate limit will be per server instance and will not work well across
+// multiple instances of the server.
+func RateLimitHandler(next http.Handler, limit rate.Limit, burst int) http.Handler {
+	limiter := rate.NewLimiter(limit, burst)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !limiter.Allow() {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(ThrottledException{
+				Message: "Rate exceeded",
+				Type:    "ThrottlingException",
+			})
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
