@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 var StatusOK = "OK"
@@ -13,6 +14,7 @@ type StatusManager struct {
 	mutex        sync.RWMutex
 	status       string
 	throttleRate int
+	Limiter      *rate.Limiter
 }
 
 func NewStatusManager() *StatusManager {

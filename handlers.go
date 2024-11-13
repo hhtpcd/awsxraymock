@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -20,11 +20,11 @@ type ThrottleResponse struct {
 
 // Response represents the structure of our JSON response
 type Response struct {
-	UnprocessedTraceSegments []TraceSegment `json:"UnprocessedTraceSegments"`
+	UnprocessedTraceSegments []UnprocessedSegmentDocuments `json:"UnprocessedTraceSegments"`
 }
 
-// TraceSegment represents each segment in the response
-type TraceSegment struct {
+// UnprocessedSegmentDocuments represents each segment in the response
+type UnprocessedSegmentDocuments struct {
 	Id        string `json:"Id"`
 	ErrorCode string `json:"ErrorCode"`
 	Message   string `json:"Message"`
@@ -34,6 +34,10 @@ type TraceSegment struct {
 type ThrottledException struct {
 	Message string `json:"message"`
 	Type    string `json:"__type"`
+}
+
+type TraceSegments struct {
+	TraceSegmentDocuments []string `json:"TraceSegmentDocuments"`
 }
 
 func handleHealthz(w http.ResponseWriter, _ *http.Request) {
@@ -124,28 +128,32 @@ func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, rate := statusManager.GetStatus()
+	// Read JSON post body
+	var traceSegments TraceSegments
+	err := json.NewDecoder(r.Body).Decode(&traceSegments)
+	if err != nil {
+		logger.Error("Failed to decode JSON",
+			zap.Error(err),
+		)
+	}
 
-	if status == StatusThrottled {
-		// generate a random number
-		prob := rand.IntN(100)
+	defer r.Body.Close()
 
-		if prob < rate {
-			response := ThrottledException{
-				Message: "Rate exceeded",
-				Type:    "ThrottlingException",
-			}
+	// Count documents in the submission.
+	docCount := len(traceSegments.TraceSegmentDocuments)
 
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
+	if !statusManager.Limiter.AllowN(time.Now(), docCount) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(w).Encode(ThrottledException{
+			Message: "Rate exceeded",
+			Type:    "ThrottlingException",
+		})
+		return
 	}
 
 	response := Response{
-		UnprocessedTraceSegments: []TraceSegment{
+		UnprocessedTraceSegments: []UnprocessedSegmentDocuments{
 			{
 				Id:        "",
 				ErrorCode: "",

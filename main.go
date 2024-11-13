@@ -23,9 +23,10 @@ func main() {
 	flag.Parse()
 
 	statusManager = NewStatusManager()
+	statusManager.Limiter = rate.NewLimiter(rate.Limit(*rateLimit), *rateBurst)
 
 	// Register handler for /TraceSegments path
-	http.Handle("/TraceSegments", RateLimitHandler(http.HandlerFunc(handleTraceSegments), rate.Limit(*rateLimit), *rateBurst))
+	http.HandleFunc("/TraceSegments", handleTraceSegments)
 	http.HandleFunc("/SetOK", handleSetOK)
 	http.HandleFunc("/SetThrottled", handleSetThrottled)
 
