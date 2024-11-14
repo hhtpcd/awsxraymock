@@ -6,6 +6,9 @@ import (
 
 	"net/http"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
@@ -13,6 +16,31 @@ import (
 
 var logger *zap.Logger
 var statusManager *StatusManager
+
+// Metrics
+var (
+	opsProcessed = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "awsxraymock_requests",
+			Help: "A counter of processed requests",
+		},
+		[]string{"method", "http_code", "path", "error"},
+	)
+	docSum = promauto.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "awsxraymock_document_segment_size",
+			Help: "The size of the document segments submitted to the API",
+		},
+		[]string{},
+	)
+	docProc = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "awsxraymock_documents",
+			Help: "Counter for the number of segment documents processed",
+		},
+		[]string{"status"},
+	)
+)
 
 func main() {
 	// Define flags for certificate and key file paths
@@ -33,6 +61,7 @@ func main() {
 	// Create a separate ServeMux for the healthz endpoint
 	healthMux := http.NewServeMux()
 	healthMux.HandleFunc("/healthz", handleHealthz)
+	healthMux.HandleFunc("/metrics", promhttp.Handler())
 
 	config := zap.NewProductionEncoderConfig()
 	config.EncodeTime = zapcore.ISO8601TimeEncoder

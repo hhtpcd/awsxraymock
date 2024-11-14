@@ -30,8 +30,8 @@ type UnprocessedSegmentDocuments struct {
 	Message   string `json:"Message"`
 }
 
-// ThrottledException represents the structure of the error response
-type ThrottledException struct {
+// ExceptionResponse represents the structure of the error response
+type ExceptionResponse struct {
 	Message string `json:"message"`
 	Type    string `json:"__type"`
 }
@@ -105,7 +105,7 @@ func RateLimitHandler(next http.Handler, limit rate.Limit, burst int) http.Handl
 		if !limiter.Allow() {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(ThrottledException{
+			json.NewEncoder(w).Encode(ExceptionResponse{
 				Message: "Rate exceeded",
 				Type:    "ThrottlingException",
 			})
@@ -117,6 +117,13 @@ func RateLimitHandler(next http.Handler, limit rate.Limit, burst int) http.Handl
 }
 
 func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
+	// TODO: add metrics for requets
+	// - histogram for request document count
+	// - counter for request types (throttled, not)
+	// - counter for JSON decode errors
+	// - counter for rate limit exceeded
+
+	// Move to main.go, and increment here instead.
 	logger.Info("Received request",
 		zap.String("method", r.Method),
 		zap.String("path", r.URL.Path),
@@ -125,6 +132,12 @@ func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		opsProcessed.WithLabelValues(
+			r.Method,
+			string(http.StatusMethodNotAllowed),
+			r.URL.String(),
+			"method_not_allowed",
+		).Inc()
 		return
 	}
 
@@ -135,20 +148,41 @@ func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
 		logger.Error("Failed to decode JSON",
 			zap.Error(err),
 		)
+		http.Error(w, "Failed to decode JSON", http.StatusBadRequest)
+		opsProcessed.WithLabelValues(
+			r.Method,
+			string(http.StatusBadRequest),
+			r.URL.String(),
+			"bad_request",
+		).Inc()
+		return
 	}
 
 	defer r.Body.Close()
 
 	// Count documents in the submission.
 	docCount := len(traceSegments.TraceSegmentDocuments)
+	docSum.WithLabelValues().Observe(float64(docCount))
 
 	if !statusManager.Limiter.AllowN(time.Now(), docCount) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		json.NewEncoder(w).Encode(ThrottledException{
+		json.NewEncoder(w).Encode(ExceptionResponse{
 			Message: "Rate exceeded",
 			Type:    "ThrottlingException",
 		})
+
+		// Record metrics
+		opsProcessed.WithLabelValues(
+			r.Method,
+			string(http.StatusTooManyRequests),
+			r.URL.String(),
+			"too_many_requests",
+		).Inc()
+		docProc.WithLabelValues(
+			"rate_limited",
+		).Add(float64(docCount))
+
 		return
 	}
 
@@ -165,4 +199,14 @@ func handleTraceSegments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+	// Record Metrics
+	opsProcessed.WithLabelValues(
+		r.Method,
+		string(http.StatusOK),
+		r.URL.String(),
+		"",
+	).Inc()
+	docProc.WithLabelValues(
+		"ok",
+	).Add(float64(docCount))
 }
