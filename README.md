@@ -18,8 +18,10 @@ openssl x509 -req -days 365 -in localhost.csr -signkey localhost.key -out localh
 ## Run
 
 ```sh
-./awsxraymockserver -crt localhost.crt -key localhost.key
+./awsxraymockserver -cert localhost.crt -key localhost.key
 ```
+
+If `-cert` and `-key` are omitted, the server generates a self-signed certificate for `localhost` and `127.0.0.1` at startup.
 
 ## Usage
 
@@ -50,4 +52,10 @@ EOF
 export AWS_ACCESS_KEY_ID=7373737373
 export AWS_SECRET_ACCESS_KEY=uuigsjdfgiusdf
 aws --endpoint-url http://localhost:3000 --no-verify-ssl xray put-trace-segments --trace-segment-documents "$DOC"
+```
+
+For the default startup path with an auto-generated certificate:
+
+```sh
+aws --endpoint-url https://localhost:8443 --no-verify-ssl xray put-trace-segments --trace-segment-documents "$DOC"
 ```
