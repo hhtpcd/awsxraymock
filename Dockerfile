@@ -16,4 +16,6 @@ FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=builder /app/awsxraymockserver /app/awsxraymockserver
 
+EXPOSE 8080 8443
+
 ENTRYPOINT ["/app/awsxraymockserver"]
